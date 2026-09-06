@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Game Probability Calculator</title>
+    <style>
+        body {
+            background-color: #2b2b2b;
+            color: #eeeeee;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: #2b2b2b;
+        }
+        fieldset {
+            border: 1px solid #555555;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #2b2b2b;
+        }
+        legend {
+            color: #eeeeee;
+            font-weight: bold;
+            padding: 0 5px;
+        }
+        .row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+        label {
+            min-width: 140px;
+        }
+        input, select {
+            background-color: #3c3f41;
+            color: #eeeeee;
+            border: 1px solid #555555;
+            padding: 5px;
+            border-radius: 3px;
+            outline: none;
+        }
+        input:focus, select:focus {
+            border-color: #777;
+        }
+        .help-btn {
+            background: #3c3f41;
+            color: #eeeeee;
+            border: 1px solid #555555;
+            width: 24px;
+            height: 24px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+            text-align: center;
+            line-height: 22px;
+        }
+        .help-btn:hover {
+            background: #555555;
+        }
+        .radio-group {
+            display: flex;
+            gap: 15px;
+        }
+        .result-box {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: #4caf50;
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Card Game Probability Calculator</h2>
+
+    <!-- Global Settings -->
+    <fieldset>
+        <legend>Global Settings</legend>
+        <div class="row">
+            <label>Total Deck Size:</label>
+            <button class="help-btn" onclick="alert('The total number of cards currently in the deck you are drawing from. For a standard opening hand, this is typically 39 (excluding your Champion).')">?</button>
+            <input type="number" id="deckSize" value="39" oninput="calculate()" style="width: 80px;">
+
+            <label style="margin-left: 20px;">Cards Drawn:</label>
+            <button class="help-btn" onclick="alert('How many cards you are pulling from the deck at one time. Set this to 4 for a standard opening draw, or adjust it if you are calculating a mulligan.')">?</button>
+            <input type="number" id="drawSize" value="4" oninput="calculate()" style="width: 80px;">
+        </div>
+        <div class="row">
+            <label>Number of Targets:</label>
+            <button class="help-btn" onclick="alert('How many different specific cards you need to track simultaneously. For example, choose 2 Cards if you are looking for a specific two-card combo.')">?</button>
+            <div class="radio-group">
+                <label><input type="radio" name="numTargets" value="1" checked onchange="updateRows()"> 1 Card</label>
+                <label><input type="radio" name="numTargets" value="2" onchange="updateRows()"> 2 Cards</label>
+                <label><input type="radio" name="numTargets" value="3" onchange="updateRows()"> 3 Cards</label>
+            </div>
+        </div>
+    </fieldset>
+
+    <!-- Card Conditions -->
+    <fieldset>
+        <legend>Card Conditions</legend>
+        <table id="cardTable">
+            <thead>
+                <tr>
+                    <th>Card</th>
+                    <th>Copies in Deck</th>
+                    <th>Condition</th>
+                    <th>Target Qty</th>
+                </tr>
+            </thead>
+            <tbody id="cardRowsContainer">
+                <!-- Dynamically populated -->
+            </tbody>
+        </table>
+    </fieldset>
+
+    <!-- Results -->
+    <div class="result-box" id="resultDisplay">
+        Probability: 0.00%
+    </div>
+</div>
+
+<script>
+    function comb(n, k) {
+        if (k < 0 || k > n) return 0;
+        if (k === 0 || k === n) return 1;
+        if (k > n / 2) k = n - k;
+        let c = 1;
+        for (let i = 1; i <= k; i++) {
+            c = c * (n - (k - i)) / i;
+        }
+        return Math.round(c);
+    }
+
+    function updateRows() {
+        const checkedRadio = document.querySelector('input[name="numTargets"]:checked');
+        if (!checkedRadio) return;
+        const numTargets = parseInt(checkedRadio.value);
+        const container = document.getElementById('cardRowsContainer');
+        container.innerHTML = '';
+
+        for (let i = 0; i < numTargets; i++) {
+            const cardLetter = String.fromCharCode(65 + i);
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>Card ${cardLetter}:</td>
+                <td>
+                    <select id="copies_${i}" onchange="updateTargetOptions(${i}); calculate()">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3" selected>3</option>
+                    </select>
+                </td>
+                <td>
+                    <select id="cond_${i}" onchange="toggleCondition(${i}); calculate()">
+                        <option value="At least" selected>At least</option>
+                        <option value="Exactly">Exactly</option>
+                        <option value="None">None</option>
+                    </select>
+                </td>
+                <td>
+                    <select id="target_${i}" onchange="calculate()">
+                        <option value="0">0</option>
+                        <option value="1" selected>1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                    </select>
+                </td>
+            `;
+            container.appendChild(row);
+            updateTargetOptions(i);
+        }
+        calculate();
+    }
+
+    function updateTargetOptions(i) {
+        const copiesSelect = document.getElementById(`copies_${i}`);
+        const targetSelect = document.getElementById(`target_${i}`);
+        const condSelect = document.getElementById(`cond_${i}`);
+        
+        if (!copiesSelect || !targetSelect || !condSelect) return;
+        if (condSelect.value === "None") return;
+
+        const maxCopies = parseInt(copiesSelect.value);
+        const currentTarget = parseInt(targetSelect.value);
+
+        targetSelect.innerHTML = '';
+        for (let num = 0; num <= maxCopies; num++) {
+            const opt = document.createElement('option');
+            opt.value = num;
+            opt.text = num;
+            if (num === Math.min(currentTarget, maxCopies)) opt.selected = true;
+            targetSelect.appendChild(opt);
+        }
+    }
+
+    function toggleCondition(i) {
+        const condSelect = document.getElementById(`cond_${i}`);
+        const targetSelect = document.getElementById(`target_${i}`);
+        if (!condSelect || !targetSelect) return;
+        
+        if (condSelect.value === "None") {
+            targetSelect.innerHTML = '<option value="0">0</option>';
+            targetSelect.disabled = true;
+            targetSelect.value = "0";
+        } else {
+            targetSelect.disabled = false;
+            updateTargetOptions(i);
+        }
+    }
+
+    function calculate() {
+        try {
+            const deckInput = document.getElementById('deckSize');
+            const drawInput = document.getElementById('drawSize');
+            if (!deckInput || !drawInput) return;
+
+            const N = parseInt(deckInput.value);
+            const n = parseInt(drawInput.value);
+
+            if (isNaN(N) || isNaN(n) || n > N || n < 0 || N <= 0) {
+                document.getElementById('resultDisplay').innerText = "Probability: --";
+                return;
+            }
+
+            const checkedRadio = document.querySelector('input[name="numTargets"]:checked');
+            const numTargets = checkedRadio ? parseInt(checkedRadio.value) : 1;
+            
+            let K_list = [];
+            let rules = [];
+            let totalCopies = 0;
+
+            for (let i = 0; i < numTargets; i++) {
+                const copiesEl = document.getElementById(`copies_${i}`);
+                const condEl = document.getElementById(`cond_${i}`);
+                const targetEl = document.getElementById(`target_${i}`);
+                
+                if (!copiesEl || !condEl || !targetEl) {
+                    document.getElementById('resultDisplay').innerText = "Probability: --";
+                    return;
+                }
+
+                const K = parseInt(copiesEl.value);
+                const cond = condEl.value;
+                const target = parseInt(targetEl.value);
+
+                if (target > K && cond !== "None") {
+                    document.getElementById('resultDisplay').innerText = "Probability: --";
+                    return;
+                }
+
+                K_list.push(K);
+                rules.push({ cond, target });
+                totalCopies += K;
+            }
+
+            if (totalCopies > N) {
+                document.getElementById('resultDisplay').innerText = "Probability: --";
+                return;
+            }
+
+            let totalProb = 0.0;
+            const totalHandsPossible = comb(N, n);
+            const restOfDeck = N - totalCopies;
+
+            const k0 = K_list[0] || 0;
+            const k1 = numTargets > 1 ? K_list[1] : 0;
+            const k2 = numTargets > 2 ? K_list[2] : 0;
+
+            for (let d0 = 0; d0 <= k0; d0++) {
+                for (let d1 = 0; d1 <= (numTargets > 1 ? k1 : 0); d1++) {
+                    for (let d2 = 0; d2 <= (numTargets > 2 ? k2 : 0); d2++) {
+                        let drawCombo = [d0];
+                        if (numTargets > 1) drawCombo.push(d1);
+                        if (numTargets > 2) drawCombo.push(d2);
+
+                        const totalDrawnTargets = drawCombo.reduce((a, b) => a + b, 0);
+                        if (totalDrawnTargets > n) continue;
+
+                        const cardsNeededFromRest = n - totalDrawnTargets;
+                        if (cardsNeededFromRest > restOfDeck) continue;
+
+                        let matchesAllRules = true;
+                        for (let i = 0; i < drawCombo.length; i++) {
+                            const drawn = drawCombo[i];
+                            const { cond, target } = rules[i];
+                            if (cond === "Exactly" && drawn !== target) matchesAllRules = false;
+                            if (cond === "At least" && drawn < target) matchesAllRules = false;
+                            if (cond === "None" && drawn !== 0) matchesAllRules = false;
+                        }
+
+                        if (matchesAllRules) {
+                            let ways = 1;
+                            for (let i = 0; i < drawCombo.length; i++) {
+                                ways *= comb(K_list[i], drawCombo[i]);
+                            }
+                            ways *= comb(restOfDeck, cardsNeededFromRest);
+                            totalProb += ways / totalHandsPossible;
+                        }
+                    }
+                }
+            }
+
+            document.getElementById('resultDisplay').innerText = `Probability: ${(totalProb * 100).toFixed(4)}%`;
+        } catch (e) {
+            document.getElementById('resultDisplay').innerText = "Probability: --";
+        }
+    }
+
+    window.onload = function() {
+        updateRows();
+    };
+</script>
+
+</body>
+</html>
