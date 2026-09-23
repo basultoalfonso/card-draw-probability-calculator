@@ -85,6 +85,12 @@
             padding: 8px;
             text-align: left;
         }
+        .logic-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 15px;
+        }
     </style>
 </head>
 <body>
@@ -118,6 +124,17 @@
     <!-- Card Conditions -->
     <fieldset>
         <legend>Card Conditions</legend>
+        
+        <!-- Logic Selector (Only visible for 2 or 3 targets) -->
+        <div class="logic-row" id="logicContainer" style="display: none;">
+            <label style="min-width: 140px;">Combine Logic:</label>
+            <button class="help-btn" onclick="alert('Choose AND if all card conditions must be met together. Choose OR if meeting any single card condition is sufficient.')">?</button>
+            <div class="radio-group">
+                <label><input type="radio" name="logicMode" value="AND" checked onchange="calculate()"> AND (All must match)</label>
+                <label><input type="radio" name="logicMode" value="OR" onchange="calculate()"> OR (Any can match)</label>
+            </div>
+        </div>
+
         <table id="cardTable">
             <thead>
                 <tr>
@@ -155,6 +172,15 @@
         const checkedRadio = document.querySelector('input[name="numTargets"]:checked');
         if (!checkedRadio) return;
         const numTargets = parseInt(checkedRadio.value);
+        
+        // Show or hide the AND/OR logic selector depending on whether we have multiple targets
+        const logicContainer = document.getElementById('logicContainer');
+        if (numTargets > 1) {
+            logicContainer.style.display = 'flex';
+        } else {
+            logicContainer.style.display = 'none';
+        }
+
         const container = document.getElementById('cardRowsContainer');
         container.innerHTML = '';
 
@@ -245,6 +271,10 @@
             const checkedRadio = document.querySelector('input[name="numTargets"]:checked');
             const numTargets = checkedRadio ? parseInt(checkedRadio.value) : 1;
             
+            // Get selected AND / OR logic mode
+            const logicModeEl = document.querySelector('input[name="logicMode"]:checked');
+            const logicMode = logicModeEl ? logicModeEl.value : "AND";
+            
             let K_list = [];
             let rules = [];
             let totalCopies = 0;
@@ -299,16 +329,32 @@
                         const cardsNeededFromRest = n - totalDrawnTargets;
                         if (cardsNeededFromRest > restOfDeck) continue;
 
-                        let matchesAllRules = true;
+                        // Evaluate rules based on AND or OR logic
+                        let combinationSatisfied = (logicMode === "AND");
+
                         for (let i = 0; i < drawCombo.length; i++) {
                             const drawn = drawCombo[i];
                             const { cond, target } = rules[i];
-                            if (cond === "Exactly" && drawn !== target) matchesAllRules = false;
-                            if (cond === "At least" && drawn < target) matchesAllRules = false;
-                            if (cond === "None" && drawn !== 0) matchesAllRules = false;
+                            
+                            let rowMatches = false;
+                            if (cond === "Exactly" && drawn === target) rowMatches = true;
+                            if (cond === "At least" && drawn >= target) rowMatches = true;
+                            if (cond === "None" && drawn === 0) rowMatches = true;
+
+                            if (logicMode === "AND") {
+                                if (!rowMatches) {
+                                    combinationSatisfied = false;
+                                    break;
+                                }
+                            } else { // OR mode
+                                if (rowMatches) {
+                                    combinationSatisfied = true;
+                                    break;
+                                }
+                            }
                         }
 
-                        if (matchesAllRules) {
+                        if (combinationSatisfied) {
                             let ways = 1;
                             for (let i = 0; i < drawCombo.length; i++) {
                                 ways *= comb(K_list[i], drawCombo[i]);
